@@ -38,15 +38,18 @@ Instead of relying on heavy black-box deep learning models that require immense 
 ## 📁 Repository Structure
 
 ```text
-microplastic-detection/
+Microplastic_Detection/
 │
 ├── data/
-│   └── README.md          # Guide on how to name and save your target sample images
+│   └── sample_led_off.tiff
+    └── sample_led_on.tiff           # Sample Data to test the pipeline
 ├── notebooks/
 │   └── demo.ipynb         # Interactive Jupyter Notebook showcasing step-by-step visual plots
 ├── src/
 │   ├── preprocess.py      # Differential subtraction, masking, and morphology operations
 │   └── predict.py         # Advanced multi-conditional feature threshold filters
-├── output/                # Local directory where processed outputs are saved
+├── README.md              # Guide on how to name and save your target sample images
 ├── main.py                # Production command-line terminal runner execution script
 ├── requirements.txt       # Global library dependency configuration list
+├── .gitignore             # Tells Git to exclude local environments and output directories
+└── LICENSE                # MIT License
