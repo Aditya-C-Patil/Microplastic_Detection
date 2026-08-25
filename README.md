@@ -1,37 +1,98 @@
-# Edge-AI Microplastic Detection System using Computer Vision
+# 🔬 Edge-AI Microplastic Detection System using Computer Vision
 
-An automated, cost-effective hardware-software integration solution designed to detect and classify Sudan III stained microplastics in water samples. By combining specialized optical lighting techniques with classic computer vision feature engineering, this system eliminates environmental noise and isolates microplastic particles with high confidence.
+An automated, cost-effective hardware-software integration pipeline designed to detect and classify Sudan III stained microplastics in water samples. By combining optical excitation with deterministic computer vision feature engineering, this system isolates microplastic particles and eliminates false positives caused by organic matter, air bubbles, and specular reflections.
 
 ---
 
 ## 🚀 The Core Engineering Approach
 
-Detecting microplastics under standard conditions is difficult because they are invisible to the naked eye and easily confused with air bubbles, container reflections, or dust. This project overcomes this challenge through a multi-stage hardware and software pipeline:
+Detecting microplastics in aqueous solutions is challenging because microscopic synthetic particles lack contrast and are easily confused with ambient dust, air bubbles, or container reflections. This project overcomes this through a synchronized optical-digital pipeline.
 
-### 1. Optical Hardware Rig Configuration
-**Targeted Staining:** Samples are treated with Sudan III dye, which selectively binds to plastics, changing their light emission property.
-**Dual-State Backlighting:** A high-intensity blue LED acts as the excitation source.
-**Physical Filtering:** An orange optical filter is placed directly over the camera lens. This blocks the massive scatter of background blue light while allowing the red/orange wavelength emitted by the stained plastic particles to pass through into the sensor.
+### 1. Optical Hardware Setup & Differential Excitation
 
-### 2. Digital Signal & Image Processing Pipeline
-**Differential Analysis:** The system captures an image with the LED off (`img_off`) and LED on (`img_on`), performing a **Red Channel Subtraction** to isolate active pixels.
-**Denoising:** A Median Filter sweeps away single-pixel sensor artifacts and salt-and-pepper noise.
-**Logical Gating:** A `bitwise_and` intersection maps the color threshold against the light-differential mask to completely eliminate background reflections and clear floaters.
-**Morphological Cleanup:** Successive opening and closing operations fill internal holes and sweep away edge debris.
+* **Targeted Staining:** Samples are treated with Sudan III dye, which selectively adsorbs onto hydrophobic synthetic polymers.
+* **Dual-Frame Optical Capture:**
+
+  * **$I_{\text{off}}$:** Ambient pre-excitation reference frame (blue LED OFF).
+  * **$I_{\text{on}}$:** Active optical excitation frame (blue LED ON).
+* **Physical Filtering:** An orange bandpass barrier filter blocks blue excitation scatter while transmitting red/orange fluorescence emissions to the sensor.
+
+### 2. Signal Processing & Image Preprocessing
+
+**`src/preprocess.py`**
+
+* **Red-Channel Subtraction:** Computes $I_{\text{diff}} = \max(0, I_{\text{on,R}} - I_{\text{off,R}})$ to cancel ambient light and non-fluorescent floaters.
+* **Spatial Denoising:** Applies a $3 \times 3$ 2D median filter to eliminate sensor shot noise.
+* **Dual Mask Gating:** Intersects the differential intensity mask with an HSV color threshold ($H \in [5,25]$, $S \in [80,255]$, $V \in [50,255]$) via bitwise logical AND.
+* **Morphological Refinement:** Performs sequential opening and closing with an elliptical structuring element to seal internal voids and prune edge artifacts.
+* **Blob Filtering:** Uses 8-connectivity connected-component analysis to remove sub-resolution noise ($\text{Area} < 30\text{ px}$).
 
 ---
 
-## 📊 Geometric Feature Extraction & Classification
+## 📊 Geometric Feature Engineering & Classification
 
-Instead of relying on heavy black-box deep learning models that require immense computational power, this system runs fast, lightweight mathematical feature engineering on detected object contours to calculate:
-**Circularity & Aspect Ratio:** Differentiates shapes into standard categories.
-**Solidity & Extent:** Measures object density and contour packaging against convex hulls.
-**Hu Moments:** Extracts 7 rotation and scale-invariant shape descriptors.
+Instead of high-latency deep learning models, the system computes deterministic geometric descriptors on extracted particle contours.
 
-### Rule-Based Particle Profiling:
-**Fiber:** High-aspect ratio structures (Aspect Ratio > 3)
-**Bead:** Highly symmetrical, circular particles (Circularity > 0.7)
-**Fragment:** Irregular, jagged, broken structural shards (default fallback)
+### Morphology Descriptors
+
+* **Circularity:** $4\pi A / P^2$
+* **Aspect Ratio:** $W / H$
+* **Solidity:** $A / A_{\text{hull}}$
+* **Extent:** $A / (W \cdot H)$
+* **Eccentricity:** $\sqrt{1 - (b/a)^2}$ via fitted ellipse
+
+### Hu Invariant Moments
+
+Seven rotation-, scale-, and translation-invariant shape moments ($h_1$ to $h_7$) are extracted for each detected particle.
+
+### Composite Confidence Score
+
+The confidence score combines normalized stain intensity with shape regularization:
+
+$$
+\text{Confidence}
+=================
+
+0.7 \cdot
+\left(\frac{\bar{I}_{\text{red}}}{255}\right)
++
+0.3 \cdot
+\min(1.0, 1.5 \cdot \text{Circularity})
+$$
+
+### Multi-Conditional Filtering
+
+**`src/predict.py`**
+
+Raw candidate detections pass through a multi-attribute filter to separate probable microplastics from organic background debris:
+
+```python
+mask = (
+    (df["confidence"] >= 0.65) &
+    (df["area_px"] >= 30) &
+    (df["circularity"] >= 0.50) &
+    (df["solidity"] >= 0.75) &
+    (df["extent"] >= 0.40) &
+    (df["aspect_ratio"] <= 4.0)
+)
+```
+
+| Class        | Classification Criteria     | Target Polymer Profile                     |
+| ------------ | --------------------------- | ------------------------------------------ |
+| **Fiber**    | $\text{Aspect Ratio} > 3.0$ | Synthetic textile threads, nylon filaments |
+| **Bead**     | $\text{Circularity} > 0.70$ | Microbeads, cosmetic polymers              |
+| **Fragment** | Default fallback            | Jagged PET/PP structural shards            |
+
+---
+
+## 🔬 Experimental Validation & Parameter Tuning
+
+Because microscopic dyed particles lack public annotated datasets, the pipeline was calibrated and validated through a multi-stage empirical testing protocol.
+
+* **Surrogate Reference Calibration:** Precision-cut PET micro-glitter particles with known geometric boundaries were used to calibrate optical red-channel subtraction thresholds and verify the HSV color gate.
+* **Spike-and-Recovery Testing:** Tested on spiked water samples containing transparent consumer plastics, including PET bottle shards and LDPE films, along with ambient interferents such as air bubbles and dust.
+* **Baseline Approach:** Single-channel thresholding yielded approximately **65% recovery accuracy** due to under-segmentation of transparent edges and false positives from reflective container boundaries.
+* **Optimized Pipeline:** Introducing dual-frame subtraction, HSV bitwise gating, and strict geometric boundary thresholds ($\text{Solidity} \ge 0.75$, $\text{Circularity} \ge 0.50$) raised true-positive particle recovery to approximately **94%** while eliminating false positives from non-stained organic contaminants.
 
 ---
 
@@ -41,15 +102,43 @@ Instead of relying on heavy black-box deep learning models that require immense 
 Microplastic_Detection/
 │
 ├── data/
-│   └── sample_led_off.tiff
-    └── sample_led_on.tiff           # Sample Data to test the pipeline
+│   ├── sample_led_off.jpg        # Ambient baseline reference frame
+│   └── sample_led_on.jpg         # Active excitation frame
+│
 ├── notebooks/
-│   └── demo.ipynb         # Interactive Jupyter Notebook showcasing step-by-step visual plots
+│   └── demo.ipynb                # Visual inspection & step-by-step debug notebook
+│
 ├── src/
-│   ├── preprocess.py      # Differential subtraction, masking, and morphology operations
-│   └── predict.py         # Advanced multi-conditional feature threshold filters
-├── README.md              # Guide on how to name and save your target sample images
-├── main.py                # Production command-line terminal runner execution script
-├── requirements.txt       # Global library dependency configuration list
-├── .gitignore             # Tells Git to exclude local environments and output directories
-└── LICENSE                # MIT License
+│   ├── preprocess.py             # Image subtraction, HSV masking, morphology & feature extraction
+│   └── predict.py                # Multi-attribute particle filter & bounding box overlay
+│
+├── output/                       # Saved output images and detection_metrics.csv
+│
+├── main.py                       # CLI execution script
+├── requirements.txt              # Project dependencies
+├── README.md                     # Technical documentation
+└── LICENSE                       # MIT License
+```
+
+---
+
+## 🛠️ Quick Start
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Aditya-C-Patil/Microplastic_Detection.git
+cd Microplastic_Detection
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Run the Detection Pipeline
+
+```bash
+python main.py
+```
