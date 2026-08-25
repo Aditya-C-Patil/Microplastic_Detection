@@ -49,16 +49,7 @@ Seven rotation-, scale-, and translation-invariant shape moments ($h_1$ to $h_7$
 
 The confidence score combines normalized stain intensity with shape regularization:
 
-$$
-\text{Confidence}
-=================
-
-0.7 \cdot
-\left(\frac{\bar{I}_{\text{red}}}{255}\right)
-+
-0.3 \cdot
-\min(1.0, 1.5 \cdot \text{Circularity})
-$$
+$\text{Confidence} = 0.7 \cdot \left(\frac{\bar{I}_{\text{red}}}{255}\right) + 0.3 \cdot \min(1.0, 1.5 \cdot \text{Circularity})$
 
 ### Multi-Conditional Filtering
 
