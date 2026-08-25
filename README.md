@@ -96,6 +96,10 @@ Microplastic_Detection/
 │   ├── sample_led_off.jpg        # Ambient baseline reference frame
 │   └── sample_led_on.jpg         # Active excitation frame
 │
+├── docs/
+│   └── DECISIONS.md              # Major architectural and engineering decisions record
+│
+│
 ├── notebooks/
 │   └── demo.ipynb                # Visual inspection & step-by-step debug notebook
 │
